@@ -1,0 +1,20 @@
+# Third-party clone (users should clone it themselves; see README)
+bilingual_book_maker/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+venv*/
+
+# Translation artifacts (test runs, cached outputs)
+*.epub
+translate_epub.cache.sqlite3
+translate_epub.log
+*.part
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

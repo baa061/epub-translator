@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EPUB Bilingual Translator — Preview</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --panel: #ffffff;
+    --border: #e8e4dc;
+    --ink: #2a2620;
+    --muted: #7a736a;
+    --accent: #d97757;
+    --accent-soft: #f5e7df;
+    --code-bg: #1d1b18;
+    --code-ink: #e8e4dc;
+    --error: #c0392b;
+    --ok: #2e7d32;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-serif, "Iowan Old Style", Georgia, serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .app { max-width: 1280px; margin: 0 auto; padding: 24px; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 22px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  h1 .accent { color: var(--accent); }
+  .meta { font-size: 13px; color: var(--muted); font-family: ui-monospace, monospace; }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 36px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 120ms ease;
+    margin-bottom: 20px;
+  }
+  .dropzone:hover, .dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
+  .dropzone.loaded {
+    padding: 16px 24px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .dropzone .hint { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .book-info { display: flex; flex-direction: column; gap: 2px; }
+  .book-info .title { font-weight: 600; font-size: 16px; }
+  .book-info .sub { color: var(--muted); font-size: 13px; font-family: ui-monospace, monospace; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .panel h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .section + .section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+  label.row { display: block; margin-bottom: 8px; font-size: 14px; }
+  label.row > span:first-child { display: block; color: var(--muted); margin-bottom: 4px; font-size: 12px; }
+  input[type="text"], input[type="password"], select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .seg { display: flex; gap: 4px; }
+  .seg button {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 5px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .seg button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .toggle input { margin: 0; }
+  .swatch {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px;
+    cursor: pointer; background: var(--bg);
+  }
+  .swatch input[type="color"] {
+    width: 28px; height: 22px; padding: 0; border: none; background: none; cursor: pointer;
+  }
+  .swatch code { font-family: ui-monospace, monospace; font-size: 12px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 9px 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 100ms ease;
+  }
+  .btn:hover:not(:disabled) { background: #c66749; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--border); }
+  .btn.secondary:hover:not(:disabled) { background: var(--bg); }
+
+  .preview-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .preview-bar .status { font-size: 13px; color: var(--muted); }
+  .preview-bar .status.error { color: var(--error); }
+  .preview-bar .status.ok { color: var(--ok); }
+  .preview-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .pane {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    min-height: 320px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .pane h4 {
+    margin: 0 0 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .pane p { margin: 0 0 0.9em; }
+  .pane .es { /* original spans, no style by default */ }
+  .pane .en { /* dynamic style applied per-element via setProperty */ }
+
+  .cmd-block {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre;
+    overflow-x: auto;
+    position: relative;
+  }
+  .cmd-block .copy {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid #444;
+    background: #2a2723;
+    color: var(--code-ink);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .cmd-block .copy:hover { background: #383530; }
+  .cmd-block .copy.copied { background: var(--ok); border-color: var(--ok); color: white; }
+
+  .footnote { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .err-banner { background: #fce8e6; border: 1px solid #f3b9b3; color: var(--error); padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+
+  .run-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .progress { margin-top: 14px; }
+  .progress-bar { height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width 200ms ease; }
+  .progress-text { margin-top: 6px; font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; display: flex; justify-content: space-between; gap: 12px; }
+  .progress-text .file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+  details summary { cursor: pointer; user-select: none; }
+</style>
+</head>
+<body>
+<div class="app" x-data="app()" x-init="init()">
+  <header>
+    <h1>EPUB <span class="accent">Bilingual</span> Translator</h1>
+    <div class="meta" x-show="book">
+      <span x-text="book && book.title"></span> · <span x-text="book && book.fileSize"></span>
+    </div>
+  </header>
+
+  <!-- Drop zone -->
+  <div
+    class="dropzone"
+    :class="{'over': dragOver, 'loaded': !!book}"
+    @dragover.prevent="dragOver = true"
+    @dragleave.prevent="dragOver = false"
+    @drop.prevent="onDrop($event)"
+    @click="$refs.file.click()"
+  >
+    <template x-if="!book">
+      <div>
+        <div style="font-size: 16px;">Drop an EPUB here, or click to choose</div>
+        <div class="hint">Stays in your browser. Never uploaded anywhere.</div>
+      </div>
+    </template>
+    <template x-if="book">
+      <div class="book-info">
+        <div class="title" x-text="book.title || book.name"></div>
+        <div class="sub">
+          <span x-text="book.author || 'Unknown author'"></span>
+          · <span x-text="book.fileSize"></span>
+          · <span x-text="(book.paragraphs.length) + ' paragraphs in first chapter'"></span>
+          · detected language: <strong x-text="LANG_NAMES[book.sourceLang] || book.sourceLang || 'unknown'"></strong>
+        </div>
+      </div>
+    </template>
+    <template x-if="book">
+      <button class="btn secondary" @click.stop="reset()">Change file</button>
+    </template>
+    <input type="file" accept=".epub" x-ref="file" hidden @change="onPick($event)">
+  </div>
+
+  <template x-if="loadError">
+    <div class="err-banner" x-text="loadError"></div>
+  </template>
+
+  <!-- Main grid: sidebar + preview -->
+  <div class="grid" x-show="book">
+
+    <!-- Sidebar -->
+    <div class="panel">
+
+      <div class="section">
+        <h3>Languages</h3>
+        <label class="row">
+          <span>From (detected)</span>
+          <input type="text" :value="LANG_NAMES[book.sourceLang] ? LANG_NAMES[book.sourceLang] + ' (' + book.sourceLang + ')' : (book.sourceLang || 'unknown')" disabled>
+        </label>
+        <label class="row">
+          <span>To</span>
+          <select x-model="targetLang">
+            <template x-for="[code, name] in Object.entries(LANG_NAMES)">
+              <option :value="code" x-text="name + ' (' + code + ')'"></option>
+            </template>
+          </select>
+        </label>
+      </div>
+
+      <div class="section">
+        <h3>Translator</h3>
+        <label class="row">
+          <span>Provider</span>
+          <div class="seg">
+            <button :class="{active: provider==='gemini'}" @click="provider='gemini'">Gemini</button>
+            <button :class="{active: provider==='claude'}" @click="provider='claude'">Claude</button>
+            <button :class="{active: provider==='openai'}" @click="provider='openai'">OpenAI</button>
+          </div>
+        </label>
+        <label class="row">
+          <span>Model</span>
+          <input type="text" x-model="models[provider]">
+        </label>
+        <label class="row">
+          <span x-text="providerInfo[provider].keyLabel"></span>
+          <input type="password" x-model="apiKeys[provider]" placeholder="AIza... / sk-ant-... / sk-..." @input="rememberKey()">
+        </label>
+        <div class="footnote">
+          Stored in tab memory only. <a href="#" @click.prevent="forgetKeys()">Forget keys</a>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Style</h3>
+        <label class="row">
+          <span>Layout</span>
+          <div class="seg">
+            <button :class="{active: style.layout==='inline'}" @click="style.layout='inline'">Inline</button>
+            <button :class="{active: style.layout==='block'}" @click="style.layout='block'">Block</button>
+          </div>
+        </label>
+        <label class="row">
+          <span>Font size</span>
+          <div class="seg">
+            <button :class="{active: style.size==='75'}" @click="style.size='75'">75%</button>
+            <button :class="{active: style.size==='85'}" @click="style.size='85'">85%</button>
+            <button :class="{active: style.size==='100'}" @click="style.size='100'">100%</button>
+          </div>
+        </label>
+        <label class="row toggle">
+          <input type="checkbox" x-model="style.italic"> <span>Italic</span>
+        </label>
+        <label class="row">
+          <span>Color</span>
+          <div class="swatch">
+            <input type="color" x-model="style.color">
+            <code x-text="style.color"></code>
+          </div>
+        </label>
+      </div>
+
+      <div class="section">
+        <h3>Output path</h3>
+        <label class="row">
+          <span>Full path to EPUB on disk</span>
+          <input type="text" x-model="bookPath" placeholder="~/Downloads/book.epub">
+        </label>
+        <div class="footnote">Used in the generated command. Browsers hide the dropped file's path for security; edit if wrong.</div>
+      </div>
+
+    </div>
+
+    <!-- Preview + command -->
+    <div>
+      <div class="preview-bar">
+        <button class="btn" @click="translatePreview()" :disabled="!apiKeys[provider] || previewState==='loading'">
+          <span x-show="previewState!=='loading'">Translate preview</span>
+          <span x-show="previewState==='loading'">Translating…</span>
+        </button>
+        <div class="status" :class="{error: previewState==='error', ok: previewState==='done'}" x-text="previewStatus"></div>
+      </div>
+
+      <div class="preview-split">
+        <div class="pane">
+          <h4>Before — Original</h4>
+          <template x-for="(p, idx) in previewParagraphs.length ? previewParagraphs : book?.paragraphs?.slice(0,6) || []">
+            <p>
+              <template x-if="previewParagraphs.length">
+                <span x-text="p.es.map(s => s + ' ').join('')"></span>
+              </template>
+              <template x-if="!previewParagraphs.length">
+                <span x-text="p.text"></span>
+              </template>
+            </p>
+          </template>
+        </div>
+        <div class="pane">
+          <h4>After — Bilingual (live styled)</h4>
+          <template x-if="previewParagraphs.length === 0">
+            <p style="color: var(--muted); font-style: italic;">Click "Translate preview" to see the styled output here.</p>
+          </template>
+          <template x-for="(p, idx) in previewParagraphs">
+            <p>
+              <template x-for="(es, i) in p.es">
+                <span><span class="es" x-text="es + ' '"></span><span class="en" :style="styleString" x-text="(p.en[i] || '') + ' '"></span></span>
+              </template>
+            </p>
+          </template>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: 20px;">
+        <h3>Run full book (in browser)</h3>
+        <div class="run-bar">
+          <button class="btn" @click="translateFullBook()" :disabled="!apiKeys[provider] || runState==='running'">
+            <span x-show="runState !== 'running'">Translate full book</span>
+            <span x-show="runState === 'running'">Translating…</span>
+          </button>
+          <button class="btn secondary" @click="shouldStop = true" x-show="runState==='running'">Stop</button>
+          <button class="btn" @click="downloadOutput()" x-show="runState==='done' && outputBlob">⬇ Download .epub</button>
+        </div>
+        <div class="progress" x-show="runState === 'running' || runState === 'done'">
+          <div class="progress-bar"><div class="progress-fill" :style="`width: ${runPercent}%`"></div></div>
+          <div class="progress-text">
+            <span><span x-text="runProgress.done"></span> / <span x-text="runProgress.total"></span> paragraphs (<span x-text="runPercent"></span>%)</span>
+            <span class="file" x-text="runProgress.currentFile"></span>
+          </div>
+        </div>
+        <template x-if="runError">
+          <div class="err-banner" style="margin-top: 12px;" x-text="runError"></div>
+        </template>
+        <div class="footnote">
+          Runs entirely in your browser using the chosen provider above. Keep this tab open until it finishes — typically 10–30 minutes depending on book length and rate limits. Translations are cached, so a stop+restart resumes near where you left off.
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: 20px;">
+        <h3>Or: generated terminal command</h3>
+        <div class="cmd-block">
+          <button class="copy" :class="{copied: copied}" @click="copyCommand()" x-text="copied ? 'Copied' : 'Copy'"></button><span x-text="generatedCommand"></span>
+        </div>
+        <div class="footnote">
+          Paste into Terminal and run. The output will be saved next to the source file as <code>..._bilingual.epub</code>.
+          Includes <code>--test --test_num 5</code> by default for a safe trial run —
+          <label class="toggle" style="margin-left: 4px;">
+            <input type="checkbox" x-model="fullRun"> <span>full book run (drop the test flags)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // (Alpine init below)
+  </script>
+</div>
+
+<script>
+const LANG_NAMES = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  nl: 'Dutch',
+  sv: 'Swedish',
+  no: 'Norwegian',
+  da: 'Danish',
+  fi: 'Finnish',
+  pl: 'Polish',
+  ru: 'Russian',
+  uk: 'Ukrainian',
+  cs: 'Czech',
+  el: 'Greek',
+  tr: 'Turkish',
+  ar: 'Arabic',
+  he: 'Hebrew',
+  hi: 'Hindi',
+  ja: 'Japanese',
+  ko: 'Korean',
+  'zh-hans': 'Chinese (Simplified)',
+  'zh-hant': 'Chinese (Traditional)',
+  vi: 'Vietnamese',
+  th: 'Thai',
+  id: 'Indonesian',
+  ms: 'Malay',
+  ro: 'Romanian',
+  hu: 'Hungarian',
+};
+
+function app() {
+  return {
+    LANG_NAMES,
+
+    // Book state
+    book: null,
+    bookFile: null,   // keep reference for full-run re-zipping
+    dragOver: false,
+    loadError: '',
+    bookPath: '',
+
+    // Target language (defaults to English unless book is already English, then Spanish)
+    targetLang: 'en',
+
+    // Full-run state
+    runState: 'idle',  // idle | running | done | error
+    runProgress: { done: 0, total: 0, currentFile: '' },
+    runCache: new Map(),  // key: provider|target|sentence  →  translation
+    outputBlob: null,
+    outputFilename: '',
+    runError: '',
+    shouldStop: false,
+
+    // Provider
+    provider: 'gemini',
+    models: {
+      gemini: 'gemini-2.5-flash',
+      claude: 'claude-sonnet-4-6',
+      openai: 'gpt-4o-mini',
+    },
+    apiKeys: { gemini: '', claude: '', openai: '' },
+    providerInfo: {
+      gemini: { keyLabel: 'Gemini API key', flag: '--gemini_key', env: 'BBM_GOOGLE_GEMINI_KEY' },
+      claude: { keyLabel: 'Anthropic API key', flag: '--claude_key', env: 'BBM_CLAUDE_API_KEY' },
+      openai: { keyLabel: 'OpenAI API key', flag: '--openai_key', env: 'OPENAI_API_KEY' },
+    },
+
+    // Style controls
+    style: { layout: 'block', size: '85', italic: true, color: '#555555' },
+
+    // Preview state
+    previewState: 'idle',  // idle | loading | done | error
+    previewError: '',
+    previewParagraphs: [], // [{ es: [string], en: [string] }]
+
+    // Command UI state
+    copied: false,
+    fullRun: false,
+
+    // ───────── computed-ish getters ─────────
+    get styleString() {
+      const parts = [`color: ${this.style.color};`];
+      if (this.style.layout === 'block') {
+        parts.push('display: block;');
+        parts.push('margin-left: 0.5em;');
+      }
+      if (this.style.italic) parts.push('font-style: italic;');
+      if (this.style.size === '75') parts.push('font-size: 0.75em;');
+      else if (this.style.size === '85') parts.push('font-size: 0.85em;');
+      return parts.join(' ');
+    },
+    get previewStatus() {
+      if (this.previewState === 'loading') return 'Calling ' + this.provider + '…';
+      if (this.previewState === 'done') return `Translated ${this.previewParagraphs.length} paragraphs.`;
+      if (this.previewState === 'error') return this.previewError;
+      return '';
+    },
+    get generatedCommand() {
+      const path = this.bookPath || '~/Downloads/book.epub';
+      const info = this.providerInfo[this.provider];
+      const model = this.models[this.provider];
+      const style = this.styleString;
+      const keyArg = `"$${info.env}"`;
+      const testFlags = this.fullRun ? '' : ' \\\n  --test --test_num 5';
+      return [
+        `# 1. Set your API key in this shell (one time per session)`,
+        `export ${info.env}="${this.apiKeys[this.provider] || 'paste-your-key-here'}"`,
+        ``,
+        `# 2. Run the translation`,
+        `cd "/Users/blaineasbury/Documents/Websites/ePub Translator/bilingual_book_maker"`,
+        `.venv/bin/python make_book.py \\`,
+        `  --book_name "${path}" \\`,
+        `  --model ${this.provider} \\`,
+        `  --model_list ${model} \\`,
+        `  --sentence_mode \\`,
+        `  --language ${this.targetLang} \\`,
+        `  ${info.flag} ${keyArg} \\`,
+        `  --translation_style "${style}"${testFlags}`,
+      ].join('\n');
+    },
+
+    // ───────── lifecycle ─────────
+    init() {
+      // Restore keys from sessionStorage
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('bilingual-keys') || '{}');
+        Object.assign(this.apiKeys, stored);
+      } catch (e) { /* ignore */ }
+    },
+    rememberKey() {
+      sessionStorage.setItem('bilingual-keys', JSON.stringify(this.apiKeys));
+    },
+    forgetKeys() {
+      this.apiKeys = { gemini: '', claude: '', openai: '' };
+      sessionStorage.removeItem('bilingual-keys');
+    },
+    reset() {
+      this.book = null;
+      this.bookFile = null;
+      this.previewParagraphs = [];
+      this.previewState = 'idle';
+      this.loadError = '';
+      this.bookPath = '';
+      this.runState = 'idle';
+      this.runProgress = { done: 0, total: 0, currentFile: '' };
+      this.runCache = new Map();
+      this.outputBlob = null;
+      this.outputFilename = '';
+      this.runError = '';
+    },
+
+    // ───────── file handling ─────────
+    onDrop(e) {
+      this.dragOver = false;
+      const file = e.dataTransfer.files[0];
+      if (file) this.loadFile(file);
+    },
+    onPick(e) {
+      const file = e.target.files[0];
+      if (file) this.loadFile(file);
+    },
+    async loadFile(file) {
+      this.loadError = '';
+      if (!file.name.toLowerCase().endsWith('.epub')) {
+        this.loadError = `"${file.name}" is not an EPUB file.`;
+        return;
+      }
+      try {
+        const zip = await JSZip.loadAsync(file);
+        const book = await this.parseEpub(zip);
+        book.name = file.name;
+        book.fileSize = formatBytes(file.size);
+        this.book = book;
+        this.bookFile = file;
+        this.bookPath = `~/Downloads/${file.name}`;
+        if (book.sourceLang === 'en') this.targetLang = 'es';
+        else this.targetLang = 'en';
+      } catch (err) {
+        console.error(err);
+        this.loadError = `Couldn't read EPUB: ${err.message}`;
+      }
+    },
+
+    async parseEpub(zip) {
+      // 1. container.xml → OPF path
+      const containerXml = await zip.file('META-INF/container.xml').async('text');
+      const opfPath = (new DOMParser()).parseFromString(containerXml, 'application/xml')
+        .querySelector('rootfile').getAttribute('full-path');
+      const opfDir = opfPath.includes('/') ? opfPath.replace(/[^/]+$/, '') : '';
+
+      // 2. Parse OPF: title, author, manifest, spine
+      const opfXml = await zip.file(opfPath).async('text');
+      const opf = (new DOMParser()).parseFromString(opfXml, 'application/xml');
+      const title = opf.querySelector('metadata > *|title, metadata > title')?.textContent?.trim() || '';
+      const author = opf.querySelector('metadata > *|creator, metadata > creator')?.textContent?.trim() || '';
+      const rawLang = opf.querySelector('metadata > *|language, metadata > language')?.textContent?.trim() || '';
+      const sourceLang = rawLang.toLowerCase().split('-')[0];  // "es-ES" → "es"
+
+      // Build href map by id
+      const hrefById = {};
+      opf.querySelectorAll('manifest > item').forEach(item => {
+        hrefById[item.getAttribute('id')] = item.getAttribute('href');
+      });
+      const spine = [...opf.querySelectorAll('spine > itemref')]
+        .map(ref => hrefById[ref.getAttribute('idref')])
+        .filter(Boolean);
+
+      // 3. Find first prose chapter — skip files that look like front matter
+      const skip = /(cubierta|cover|titulo|title|info|copyright|imprint|toc|nav)/i;
+      let chapterParagraphs = [];
+      let chapterHref = null;
+      for (const href of spine) {
+        if (skip.test(href)) continue;
+        const path = opfDir + href;
+        const file = zip.file(path);
+        if (!file) continue;
+        const xhtml = await file.async('text');
+        const doc = (new DOMParser()).parseFromString(xhtml, 'application/xhtml+xml');
+        const paras = [...doc.querySelectorAll('body p')]
+          .map(p => p.textContent.replace(/\s+/g, ' ').trim())
+          .filter(t => t.length > 20);  // skip headings / empty / decorative
+        if (paras.length >= 3) {
+          chapterParagraphs = paras.map(text => ({ text }));
+          chapterHref = href;
+          break;
+        }
+      }
+      if (chapterParagraphs.length === 0) {
+        throw new Error('No prose chapter found in spine.');
+      }
+
+      return { title, author, sourceLang, paragraphs: chapterParagraphs, chapterHref };
+    },
+
+    // ───────── sentence splitting (mirrors bilingual_book_maker:560-563) ─────────
+    splitSentences(text) {
+      const parts = text.trim().split(/(?<=[.!?…])\s+(?=[«¿¡"'(\[\d—A-ZÁÉÍÓÚÜÑ])/);
+      return parts.map(s => s.trim()).filter(Boolean);
+    },
+
+    // ───────── preview translation ─────────
+    async translatePreview() {
+      if (!this.book || !this.apiKeys[this.provider]) return;
+      this.previewState = 'loading';
+      this.previewError = '';
+      this.previewParagraphs = [];
+
+      const paras = this.book.paragraphs.slice(0, 6);
+      try {
+        for (const p of paras) {
+          const sentences = this.splitSentences(p.text);
+          const translations = [];
+          for (const s of sentences) {
+            translations.push(await this.translateOne(s));
+          }
+          // Push incrementally so user sees progress
+          this.previewParagraphs.push({ es: sentences, en: translations });
+        }
+        this.previewState = 'done';
+      } catch (err) {
+        console.error(err);
+        this.previewState = 'error';
+        this.previewError = err.message || String(err);
+      }
+    },
+
+    async translateOne(sentence) {
+      const cacheKey = `${this.provider}|${this.models[this.provider]}|${this.targetLang}|${sentence}`;
+      if (this.runCache.has(cacheKey)) return this.runCache.get(cacheKey);
+      const srcName = LANG_NAMES[this.book.sourceLang] || this.book.sourceLang || 'the source language';
+      const tgtName = LANG_NAMES[this.targetLang] || this.targetLang;
+      const prompt = `Translate the following ${srcName} text to natural, literary ${tgtName}. Return ONLY the translation, no commentary, no quotation marks unless they appear in the original. Preserve em-dashes used for dialogue.\n\n${srcName}: ${sentence}\n\n${tgtName}:`;
+      let result;
+      if (this.provider === 'gemini')      result = await this.callGemini(prompt);
+      else if (this.provider === 'claude') result = await this.callClaude(prompt);
+      else if (this.provider === 'openai') result = await this.callOpenAI(prompt);
+      else throw new Error('Unknown provider');
+      this.runCache.set(cacheKey, result);
+      return result;
+    },
+
+    async callGemini(prompt) {
+      const model = this.models.gemini;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKeys.gemini}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2 },
+        }),
+      });
+      if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+    },
+
+    async callClaude(prompt) {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKeys.claude,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: this.models.claude,
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return (data.content?.[0]?.text || '').trim();
+    },
+
+    async callOpenAI(prompt) {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKeys.openai}`,
+        },
+        body: JSON.stringify({
+          model: this.models.openai,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+        }),
+      });
+      if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return (data.choices?.[0]?.message?.content || '').trim();
+    },
+
+    // ───────── command copy ─────────
+    async copyCommand() {
+      try {
+        await navigator.clipboard.writeText(this.generatedCommand);
+        this.copied = true;
+        setTimeout(() => this.copied = false, 1500);
+      } catch (e) {
+        alert('Copy failed: ' + e.message);
+      }
+    },
+
+    // ───────── in-browser full-book run ─────────
+    get runPercent() {
+      if (!this.runProgress.total) return 0;
+      return Math.round(100 * this.runProgress.done / this.runProgress.total);
+    },
+
+    async translateFullBook() {
+      if (!this.bookFile || !this.apiKeys[this.provider]) return;
+      this.runState = 'running';
+      this.shouldStop = false;
+      this.runError = '';
+      this.outputBlob = null;
+      this.runProgress = { done: 0, total: 0, currentFile: '' };
+
+      try {
+        const zip = await JSZip.loadAsync(this.bookFile);
+
+        // Re-resolve OPF + spine
+        const containerXml = await zip.file('META-INF/container.xml').async('text');
+        const opfPath = (new DOMParser()).parseFromString(containerXml, 'application/xml')
+          .querySelector('rootfile').getAttribute('full-path');
+        const opfDir = opfPath.includes('/') ? opfPath.replace(/[^/]+$/, '') : '';
+        const opfXml = await zip.file(opfPath).async('text');
+        const opf = (new DOMParser()).parseFromString(opfXml, 'application/xml');
+        const hrefById = {};
+        opf.querySelectorAll('manifest > item').forEach(item => {
+          hrefById[item.getAttribute('id')] = item.getAttribute('href');
+        });
+        const spine = [...opf.querySelectorAll('spine > itemref')]
+          .map(ref => hrefById[ref.getAttribute('idref')])
+          .filter(Boolean);
+
+        const skip = /(cubierta|cover|nav|toc)/i;
+        const targets = [];
+        for (const href of spine) {
+          if (skip.test(href)) continue;
+          const path = opfDir + href;
+          if (zip.file(path)) targets.push({ href, path });
+        }
+
+        // Pre-pass: count paragraphs for progress bar
+        let total = 0;
+        for (const { path } of targets) {
+          const xhtml = await zip.file(path).async('text');
+          const doc = (new DOMParser()).parseFromString(xhtml, 'application/xhtml+xml');
+          total += [...doc.querySelectorAll('body p')]
+            .filter(p => p.textContent.replace(/\s+/g, ' ').trim().length > 20).length;
+        }
+        this.runProgress.total = total;
+
+        // Translate file-by-file, paragraph-by-paragraph
+        for (const { href, path } of targets) {
+          if (this.shouldStop) break;
+          this.runProgress.currentFile = href;
+          const xhtml = await zip.file(path).async('text');
+          const modified = await this.translateXhtml(xhtml);
+          zip.file(path, modified);
+        }
+
+        if (this.shouldStop) {
+          this.runState = 'idle';
+          return;
+        }
+
+        // Preserve mimetype's STORED compression (EPUB spec)
+        const mimetypeContent = await zip.file('mimetype').async('text');
+        zip.file('mimetype', mimetypeContent, { compression: 'STORE' });
+
+        const blob = await zip.generateAsync({
+          type: 'blob',
+          mimeType: 'application/epub+zip',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 },
+        });
+        const baseName = this.bookFile.name.replace(/\.epub$/i, '');
+        this.outputFilename = `${baseName}_bilingual.epub`;
+        this.outputBlob = blob;
+        this.runState = 'done';
+      } catch (err) {
+        console.error(err);
+        this.runError = err.message || String(err);
+        this.runState = 'error';
+      }
+    },
+
+    async translateXhtml(xhtmlText) {
+      const xhtmlNs = 'http://www.w3.org/1999/xhtml';
+      const doc = (new DOMParser()).parseFromString(xhtmlText, 'application/xhtml+xml');
+      const paras = [...doc.querySelectorAll('body p')];
+
+      for (const p of paras) {
+        if (this.shouldStop) break;
+        const text = p.textContent.replace(/\s+/g, ' ').trim();
+        if (text.length < 20) continue;
+        const sentences = this.splitSentences(text);
+        if (sentences.length === 0) continue;
+
+        const translations = [];
+        for (const s of sentences) {
+          try {
+            translations.push(await this.translateOne(s));
+          } catch (err) {
+            console.warn('translation failed:', err);
+            translations.push(`[untranslated] ${s}`);
+          }
+        }
+
+        while (p.firstChild) p.removeChild(p.firstChild);
+        for (let i = 0; i < sentences.length; i++) {
+          const esSpan = doc.createElementNS(xhtmlNs, 'span');
+          esSpan.setAttribute('class', 'es');
+          esSpan.textContent = sentences[i] + ' ';
+          p.appendChild(esSpan);
+          const enSpan = doc.createElementNS(xhtmlNs, 'span');
+          enSpan.setAttribute('class', 'en');
+          enSpan.setAttribute('style', this.styleString);
+          enSpan.textContent = translations[i] + ' ';
+          p.appendChild(enSpan);
+        }
+
+        this.runProgress.done += 1;
+      }
+
+      return new XMLSerializer().serializeToString(doc);
+    },
+
+    downloadOutput() {
+      if (!this.outputBlob) return;
+      const url = URL.createObjectURL(this.outputBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = this.outputFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    },
+  };
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+}
+</script>
+</body>
+</html>
