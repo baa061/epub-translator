@@ -7,9 +7,10 @@ to read literature in the original while keeping a translation a glance away.
 
 There are two ways to use it:
 
-1. **`index.html`** — a single-file browser UI. Drop an EPUB in, pick an AI
-   (Gemini, Claude, OpenAI, Groq, DeepSeek, Mistral, or OpenRouter), tweak
-   the translation style live, and run the full translation in the browser.
+1. **`index.html`** — a single-file browser UI. Drop an EPUB in, pick a
+   translator (Gemini, Claude, OpenAI, Groq, DeepSeek, Mistral, OpenRouter,
+   Lingva, or MyMemory — the last two need no API key), tweak the
+   translation style live, and run the full translation in the browser.
    No install.
 2. **`translate_epub.py`** — a standalone Python script that translates an
    EPUB via free Google Translate (no API key, no cost) with a SQLite cache
@@ -44,6 +45,12 @@ inserted inline.
    - **DeepSeek** — [get a key](https://platform.deepseek.com/api_keys) (very cheap, strong multilingual)
    - **Mistral** — [get a key](https://console.mistral.ai/api-keys/) (good European languages)
    - **OpenRouter** — [get a key](https://openrouter.ai/keys) (one key, access to many models)
+   - **Lingva** — no key. Public proxy to Google Translate. Rate-limited; best for previews.
+   - **MyMemory** — no key (optional email raises limit). ~10K chars/day per IP. Translation-memory based.
+
+   The no-key options work for previewing and short books. For a full novel,
+   use `translate_epub.py` (below) — same free Google Translate quality with
+   retries, paragraph batching, and a resumable cache.
 5. Pick style: **layout** (inline / block-below), **size** (75/85/100%),
    **italic** toggle, **color** picker.
 6. Click **Translate preview** — translates the first 6 paragraphs so you can

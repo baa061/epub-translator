@@ -331,16 +331,25 @@
           </select>
         </label>
         <label class="row">
-          <span>Model</span>
+          <span x-text="providerInfo[provider].modelLabel || 'Model'"></span>
           <input type="text" x-model="models[provider]">
         </label>
-        <label class="row">
-          <span x-text="providerInfo[provider].keyLabel"></span>
-          <input type="password" x-model="apiKeys[provider]" placeholder="AIza... / sk-ant-... / sk-..." @input="rememberKey()">
-        </label>
-        <div class="footnote">
-          Stored in tab memory only. <a href="#" @click.prevent="forgetKeys()">Forget keys</a>
-        </div>
+        <template x-if="providerInfo[provider].requiresKey">
+          <label class="row">
+            <span x-text="providerInfo[provider].keyLabel"></span>
+            <input type="password" x-model="apiKeys[provider]" placeholder="AIza... / sk-ant-... / sk-..." @input="rememberKey()">
+          </label>
+        </template>
+        <template x-if="providerInfo[provider].requiresKey">
+          <div class="footnote">
+            Stored in tab memory only. <a href="#" @click.prevent="forgetKeys()">Forget keys</a>
+          </div>
+        </template>
+        <template x-if="!providerInfo[provider].requiresKey">
+          <div class="footnote">
+            No API key required. Rate-limited — fine for previews and short books; full novels will hit limits. For a full book, run <code>translate_epub.py</code> from the repo instead.
+          </div>
+        </template>
       </div>
 
       <div class="section">
@@ -386,7 +395,7 @@
     <!-- Preview + command -->
     <div>
       <div class="preview-bar">
-        <button class="btn" @click="translatePreview()" :disabled="!apiKeys[provider] || previewState==='loading'">
+        <button class="btn" @click="translatePreview()" :disabled="(providerInfo[provider].requiresKey && !apiKeys[provider]) || previewState==='loading'">
           <span x-show="previewState!=='loading'">Translate preview</span>
           <span x-show="previewState==='loading'">Translating…</span>
         </button>
@@ -425,7 +434,7 @@
       <div class="panel" style="margin-top: 20px;">
         <h3>Run full book (in browser)</h3>
         <div class="run-bar">
-          <button class="btn" @click="translateFullBook()" :disabled="!apiKeys[provider] || runState==='running'">
+          <button class="btn" @click="translateFullBook()" :disabled="(providerInfo[provider].requiresKey && !apiKeys[provider]) || runState==='running'">
             <span x-show="runState !== 'running'">Translate full book</span>
             <span x-show="runState === 'running'">Translating…</span>
           </button>
@@ -554,16 +563,20 @@ function app() {
       deepseek: 'deepseek-chat',
       mistral: 'mistral-medium-latest',
       openrouter: 'anthropic/claude-sonnet-4',
+      lingva: 'https://lingva.ml',  // configurable instance URL
+      mymemory: '',                 // optional email for higher daily limit
     },
-    apiKeys: { gemini: '', claude: '', openai: '', groq: '', deepseek: '', mistral: '', openrouter: '' },
+    apiKeys: { gemini: '', claude: '', openai: '', groq: '', deepseek: '', mistral: '', openrouter: '', lingva: '', mymemory: '' },
     providerInfo: {
-      gemini:     { label: 'Gemini',     keyLabel: 'Gemini API key',     flag: '--gemini_key', env: 'BBM_GOOGLE_GEMINI_KEY', bbmModel: 'gemini' },
-      claude:     { label: 'Claude',     keyLabel: 'Anthropic API key',  flag: '--claude_key', env: 'BBM_CLAUDE_API_KEY',     bbmModel: 'claude' },
-      openai:     { label: 'OpenAI',     keyLabel: 'OpenAI API key',     flag: '--openai_key', env: 'OPENAI_API_KEY',         bbmModel: 'openai' },
-      groq:       { label: 'Groq (free tier, Llama 3.3)', keyLabel: 'Groq API key', flag: '--groq_key', env: 'BBM_GROQ_API_KEY', bbmModel: 'groq' },
-      deepseek:   { label: 'DeepSeek',   keyLabel: 'DeepSeek API key',   flag: null, env: null, bbmModel: null },
-      mistral:    { label: 'Mistral',    keyLabel: 'Mistral API key',    flag: null, env: null, bbmModel: null },
-      openrouter: { label: 'OpenRouter (gateway to many models)', keyLabel: 'OpenRouter API key', flag: null, env: null, bbmModel: null },
+      gemini:     { label: 'Gemini',     keyLabel: 'Gemini API key',     flag: '--gemini_key', env: 'BBM_GOOGLE_GEMINI_KEY', bbmModel: 'gemini', requiresKey: true },
+      claude:     { label: 'Claude',     keyLabel: 'Anthropic API key',  flag: '--claude_key', env: 'BBM_CLAUDE_API_KEY',     bbmModel: 'claude', requiresKey: true },
+      openai:     { label: 'OpenAI',     keyLabel: 'OpenAI API key',     flag: '--openai_key', env: 'OPENAI_API_KEY',         bbmModel: 'openai', requiresKey: true },
+      groq:       { label: 'Groq (free tier, Llama 3.3)', keyLabel: 'Groq API key', flag: '--groq_key', env: 'BBM_GROQ_API_KEY', bbmModel: 'groq', requiresKey: true },
+      deepseek:   { label: 'DeepSeek',   keyLabel: 'DeepSeek API key',   flag: null, env: null, bbmModel: null, requiresKey: true },
+      mistral:    { label: 'Mistral',    keyLabel: 'Mistral API key',    flag: null, env: null, bbmModel: null, requiresKey: true },
+      openrouter: { label: 'OpenRouter (gateway to many models)', keyLabel: 'OpenRouter API key', flag: null, env: null, bbmModel: null, requiresKey: true },
+      lingva:     { label: 'Lingva (Google Translate proxy, no key)',   keyLabel: 'Optional: email', flag: null, env: null, bbmModel: 'google', requiresKey: false, modelLabel: 'Lingva instance URL' },
+      mymemory:   { label: 'MyMemory (no key, ~10K chars/day)',         keyLabel: 'Optional: email', flag: null, env: null, bbmModel: null, requiresKey: false, modelLabel: 'Optional email (raises daily limit)' },
     },
 
     // Style controls
@@ -741,7 +754,8 @@ function app() {
 
     // ───────── preview translation ─────────
     async translatePreview() {
-      if (!this.book || !this.apiKeys[this.provider]) return;
+      if (!this.book) return;
+      if (this.providerInfo[this.provider].requiresKey && !this.apiKeys[this.provider]) return;
       this.previewState = 'loading';
       this.previewError = '';
       this.previewParagraphs = [];
@@ -779,6 +793,8 @@ function app() {
       else if (this.provider === 'deepseek')   result = await this.callOpenAICompat(prompt, 'https://api.deepseek.com/v1/chat/completions',    this.apiKeys.deepseek,   this.models.deepseek);
       else if (this.provider === 'mistral')    result = await this.callOpenAICompat(prompt, 'https://api.mistral.ai/v1/chat/completions',      this.apiKeys.mistral,    this.models.mistral);
       else if (this.provider === 'openrouter') result = await this.callOpenAICompat(prompt, 'https://openrouter.ai/api/v1/chat/completions',    this.apiKeys.openrouter, this.models.openrouter);
+      else if (this.provider === 'lingva')     result = await this.callLingva(sentence);
+      else if (this.provider === 'mymemory')   result = await this.callMyMemory(sentence);
       else throw new Error('Unknown provider');
       this.runCache.set(cacheKey, result);
       return result;
@@ -818,6 +834,31 @@ function app() {
       if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 200)}`);
       const data = await res.json();
       return (data.content?.[0]?.text || '').trim();
+    },
+
+    async callLingva(sentence) {
+      const instance = (this.models.lingva || 'https://lingva.ml').replace(/\/$/, '');
+      const src = this.book.sourceLang || 'auto';
+      const tgt = this.targetLang;
+      const url = `${instance}/api/v1/${src}/${tgt}/${encodeURIComponent(sentence)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Lingva ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return (data.translation || '').trim();
+    },
+
+    async callMyMemory(sentence) {
+      const src = this.book.sourceLang;
+      const tgt = this.targetLang;
+      let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sentence)}&langpair=${encodeURIComponent(src)}|${encodeURIComponent(tgt)}`;
+      if (this.models.mymemory) url += `&de=${encodeURIComponent(this.models.mymemory)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`MyMemory ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      if (data.responseStatus && data.responseStatus !== 200) {
+        throw new Error(`MyMemory: ${data.responseDetails || 'rate limit reached'}`);
+      }
+      return (data.responseData?.translatedText || '').trim();
     },
 
     async callOpenAICompat(prompt, url, key, model) {
@@ -865,7 +906,8 @@ function app() {
     },
 
     async translateFullBook() {
-      if (!this.bookFile || !this.apiKeys[this.provider]) return;
+      if (!this.bookFile) return;
+      if (this.providerInfo[this.provider].requiresKey && !this.apiKeys[this.provider]) return;
       this.runState = 'running';
       this.shouldStop = false;
       this.runError = '';
