@@ -487,7 +487,8 @@
     Intended for EPUBs you legally own or that are in the public domain.
     Don't use this with copyrighted material you don't have the right to modify.
     See the <a href="https://github.com/baa061/epub-translator/blob/main/DISCLAIMER.md" target="_blank" rel="noopener">full disclaimer</a> ·
-    <a href="https://github.com/baa061/epub-translator" target="_blank" rel="noopener">source on GitHub</a>.
+    <a href="https://github.com/baa061/epub-translator" target="_blank" rel="noopener">source on GitHub</a>
+    · <a :href="`https://github.com/baa061/epub-translator/commits/main`" target="_blank" rel="noopener">v<span x-text="VERSION"></span></a>
   </footer>
 </div>
 
@@ -525,6 +526,9 @@ const LANG_NAMES = {
   hu: 'Hungarian',
 };
 
+// VERSION — bumped on every push to GitHub
+const VERSION = '1.0.0';
+
 function app() {
   const ua = navigator.userAgent;
   const isChromium = /Chrome|Chromium|Edg/i.test(ua) && !/OPR\//.test(ua);
@@ -532,6 +536,7 @@ function app() {
 
   return {
     LANG_NAMES,
+    VERSION,
     isChromium,
     isSafari,
 
