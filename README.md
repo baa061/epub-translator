@@ -27,7 +27,11 @@ inserted inline.
 
 ### Quick start
 
-1. Open `index.html` in Chrome or Safari (`file://` works, no server needed).
+> **Use Google Chrome.** Safari's stricter CORS and fetch behavior causes
+> intermittent failures when calling the AI provider APIs directly from the
+> browser. Chrome is the tested/recommended browser.
+
+1. Open `index.html` in **Google Chrome** (`file://` works, no server needed).
 2. Drag an EPUB into the dropzone.
 3. The page auto-detects the source language from the EPUB metadata and
    defaults the target to English (or Spanish if the book is in English).

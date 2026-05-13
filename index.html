@@ -98,9 +98,9 @@
     color: var(--ink);
   }
   input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .seg { display: flex; gap: 4px; }
+  .seg { display: flex; gap: 4px; flex-wrap: wrap; }
   .seg button {
-    flex: 1;
+    flex: 1 1 70px;
     padding: 6px 8px;
     border: 1px solid var(--border);
     background: var(--bg);
@@ -216,6 +216,20 @@
   .disclaimer a { color: var(--accent); text-decoration: none; }
   .disclaimer a:hover { text-decoration: underline; }
   .err-banner { background: #fce8e6; border: 1px solid #f3b9b3; color: var(--error); padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+  .browser-notice {
+    background: #fff7e8;
+    border: 1px solid #f0d9a0;
+    color: #7a5a10;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .browser-notice.safari { background: #fce8e6; border-color: #f3b9b3; color: var(--error); }
+  .browser-notice strong { font-weight: 600; }
 
   .run-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .progress { margin-top: 14px; }
@@ -234,6 +248,19 @@
       <span x-text="book && book.title"></span> · <span x-text="book && book.fileSize"></span>
     </div>
   </header>
+
+  <div class="browser-notice" :class="{safari: isSafari}" x-show="isSafari || !isChromium">
+    <span x-show="isSafari">⚠</span>
+    <span x-show="!isSafari && !isChromium">ℹ</span>
+    <div>
+      <template x-if="isSafari">
+        <span><strong>Safari may not work reliably.</strong> This app uses browser-direct API calls that Safari sometimes blocks via stricter CORS or fetch behavior. <strong>Please open this page in Google Chrome</strong> for best results.</span>
+      </template>
+      <template x-if="!isSafari && !isChromium">
+        <span><strong>For best results, use Google Chrome.</strong> Tested primarily in Chrome; other browsers may behave inconsistently with the AI provider APIs.</span>
+      </template>
+    </div>
+  </div>
 
   <!-- Drop zone -->
   <div
@@ -479,8 +506,14 @@ const LANG_NAMES = {
 };
 
 function app() {
+  const ua = navigator.userAgent;
+  const isChromium = /Chrome|Chromium|Edg/i.test(ua) && !/OPR\//.test(ua);
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua) && !isChromium;
+
   return {
     LANG_NAMES,
+    isChromium,
+    isSafari,
 
     // Book state
     book: null,
