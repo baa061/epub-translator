@@ -324,11 +324,11 @@
         <h3>Translator</h3>
         <label class="row">
           <span>Provider</span>
-          <div class="seg">
-            <button :class="{active: provider==='gemini'}" @click="provider='gemini'">Gemini</button>
-            <button :class="{active: provider==='claude'}" @click="provider='claude'">Claude</button>
-            <button :class="{active: provider==='openai'}" @click="provider='openai'">OpenAI</button>
-          </div>
+          <select x-model="provider">
+            <template x-for="[id, info] in Object.entries(providerInfo)">
+              <option :value="id" x-text="info.label"></option>
+            </template>
+          </select>
         </label>
         <label class="row">
           <span>Model</span>
@@ -447,19 +447,29 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-top: 20px;">
-        <h3>Or: generated terminal command</h3>
-        <div class="cmd-block">
-          <button class="copy" :class="{copied: copied}" @click="copyCommand()" x-text="copied ? 'Copied' : 'Copy'"></button><span x-text="generatedCommand"></span>
+      <template x-if="providerInfo[provider].bbmModel">
+        <div class="panel" style="margin-top: 20px;">
+          <h3>Or: generated terminal command</h3>
+          <div class="cmd-block">
+            <button class="copy" :class="{copied: copied}" @click="copyCommand()" x-text="copied ? 'Copied' : 'Copy'"></button><span x-text="generatedCommand"></span>
+          </div>
+          <div class="footnote">
+            Paste into Terminal and run. The output will be saved next to the source file as <code>..._bilingual.epub</code>.
+            Includes <code>--test --test_num 5</code> by default for a safe trial run —
+            <label class="toggle" style="margin-left: 4px;">
+              <input type="checkbox" x-model="fullRun"> <span>full book run (drop the test flags)</span>
+            </label>
+          </div>
         </div>
-        <div class="footnote">
-          Paste into Terminal and run. The output will be saved next to the source file as <code>..._bilingual.epub</code>.
-          Includes <code>--test --test_num 5</code> by default for a safe trial run —
-          <label class="toggle" style="margin-left: 4px;">
-            <input type="checkbox" x-model="fullRun"> <span>full book run (drop the test flags)</span>
-          </label>
+      </template>
+      <template x-if="!providerInfo[provider].bbmModel">
+        <div class="panel" style="margin-top: 20px;">
+          <h3>Terminal command — not available</h3>
+          <div class="footnote">
+            <code x-text="providerInfo[provider].label"></code> has no native bilingual_book_maker backend, so there's no terminal command to generate. Use the in-browser "Translate full book" button above.
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 
@@ -540,12 +550,20 @@ function app() {
       gemini: 'gemini-2.5-flash',
       claude: 'claude-sonnet-4-6',
       openai: 'gpt-4o-mini',
+      groq: 'llama-3.3-70b-versatile',
+      deepseek: 'deepseek-chat',
+      mistral: 'mistral-medium-latest',
+      openrouter: 'anthropic/claude-sonnet-4',
     },
-    apiKeys: { gemini: '', claude: '', openai: '' },
+    apiKeys: { gemini: '', claude: '', openai: '', groq: '', deepseek: '', mistral: '', openrouter: '' },
     providerInfo: {
-      gemini: { keyLabel: 'Gemini API key', flag: '--gemini_key', env: 'BBM_GOOGLE_GEMINI_KEY' },
-      claude: { keyLabel: 'Anthropic API key', flag: '--claude_key', env: 'BBM_CLAUDE_API_KEY' },
-      openai: { keyLabel: 'OpenAI API key', flag: '--openai_key', env: 'OPENAI_API_KEY' },
+      gemini:     { label: 'Gemini',     keyLabel: 'Gemini API key',     flag: '--gemini_key', env: 'BBM_GOOGLE_GEMINI_KEY', bbmModel: 'gemini' },
+      claude:     { label: 'Claude',     keyLabel: 'Anthropic API key',  flag: '--claude_key', env: 'BBM_CLAUDE_API_KEY',     bbmModel: 'claude' },
+      openai:     { label: 'OpenAI',     keyLabel: 'OpenAI API key',     flag: '--openai_key', env: 'OPENAI_API_KEY',         bbmModel: 'openai' },
+      groq:       { label: 'Groq (free tier, Llama 3.3)', keyLabel: 'Groq API key', flag: '--groq_key', env: 'BBM_GROQ_API_KEY', bbmModel: 'groq' },
+      deepseek:   { label: 'DeepSeek',   keyLabel: 'DeepSeek API key',   flag: null, env: null, bbmModel: null },
+      mistral:    { label: 'Mistral',    keyLabel: 'Mistral API key',    flag: null, env: null, bbmModel: null },
+      openrouter: { label: 'OpenRouter (gateway to many models)', keyLabel: 'OpenRouter API key', flag: null, env: null, bbmModel: null },
     },
 
     // Style controls
@@ -754,9 +772,13 @@ function app() {
       const tgtName = LANG_NAMES[this.targetLang] || this.targetLang;
       const prompt = `Translate the following ${srcName} text to natural, literary ${tgtName}. Return ONLY the translation, no commentary, no quotation marks unless they appear in the original. Preserve em-dashes used for dialogue.\n\n${srcName}: ${sentence}\n\n${tgtName}:`;
       let result;
-      if (this.provider === 'gemini')      result = await this.callGemini(prompt);
-      else if (this.provider === 'claude') result = await this.callClaude(prompt);
-      else if (this.provider === 'openai') result = await this.callOpenAI(prompt);
+      if (this.provider === 'gemini')          result = await this.callGemini(prompt);
+      else if (this.provider === 'claude')     result = await this.callClaude(prompt);
+      else if (this.provider === 'openai')     result = await this.callOpenAICompat(prompt, 'https://api.openai.com/v1/chat/completions',     this.apiKeys.openai,     this.models.openai);
+      else if (this.provider === 'groq')       result = await this.callOpenAICompat(prompt, 'https://api.groq.com/openai/v1/chat/completions', this.apiKeys.groq,       this.models.groq);
+      else if (this.provider === 'deepseek')   result = await this.callOpenAICompat(prompt, 'https://api.deepseek.com/v1/chat/completions',    this.apiKeys.deepseek,   this.models.deepseek);
+      else if (this.provider === 'mistral')    result = await this.callOpenAICompat(prompt, 'https://api.mistral.ai/v1/chat/completions',      this.apiKeys.mistral,    this.models.mistral);
+      else if (this.provider === 'openrouter') result = await this.callOpenAICompat(prompt, 'https://openrouter.ai/api/v1/chat/completions',    this.apiKeys.openrouter, this.models.openrouter);
       else throw new Error('Unknown provider');
       this.runCache.set(cacheKey, result);
       return result;
@@ -798,20 +820,29 @@ function app() {
       return (data.content?.[0]?.text || '').trim();
     },
 
-    async callOpenAI(prompt) {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    async callOpenAICompat(prompt, url, key, model) {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+      };
+      // OpenRouter likes optional Referer/Title for attribution; harmless elsewhere.
+      if (url.includes('openrouter.ai')) {
+        headers['HTTP-Referer'] = 'https://baa061.github.io/epub-translator/';
+        headers['X-Title'] = 'EPUB Bilingual Translator';
+      }
+      const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKeys.openai}`,
-        },
+        headers,
         body: JSON.stringify({
-          model: this.models.openai,
+          model: model,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.2,
         }),
       });
-      if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      if (!res.ok) {
+        const host = new URL(url).hostname;
+        throw new Error(`${host} ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      }
       const data = await res.json();
       return (data.choices?.[0]?.message?.content || '').trim();
     },
