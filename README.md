@@ -8,8 +8,9 @@ to read literature in the original while keeping a translation a glance away.
 There are two ways to use it:
 
 1. **`index.html`** — a single-file browser UI. Drop an EPUB in, pick an AI
-   (Gemini / Claude / OpenAI), tweak the translation style live, and run the
-   full translation in the browser. No install.
+   (Gemini, Claude, OpenAI, Groq, DeepSeek, Mistral, or OpenRouter), tweak
+   the translation style live, and run the full translation in the browser.
+   No install.
 2. **`translate_epub.py`** — a standalone Python script that translates an
    EPUB via free Google Translate (no API key, no cost) with a SQLite cache
    so interrupted runs resume cleanly. Sentence-level, paragraph-batched.
@@ -35,10 +36,14 @@ inserted inline.
 2. Drag an EPUB into the dropzone.
 3. The page auto-detects the source language from the EPUB metadata and
    defaults the target to English (or Spanish if the book is in English).
-4. Pick a translator: **Gemini**, **Claude**, or **OpenAI**. Paste the API key.
-   - [Get a Gemini key](https://aistudio.google.com/apikey)
-   - [Get a Claude key](https://console.anthropic.com/settings/keys)
-   - [Get an OpenAI key](https://platform.openai.com/api-keys)
+4. Pick a translator and paste the API key:
+   - **Gemini** — [get a key](https://aistudio.google.com/apikey) (free tier available)
+   - **Claude** — [get a key](https://console.anthropic.com/settings/keys)
+   - **OpenAI** — [get a key](https://platform.openai.com/api-keys)
+   - **Groq** — [get a key](https://console.groq.com/keys) (free tier, fast Llama 3.3 70B)
+   - **DeepSeek** — [get a key](https://platform.deepseek.com/api_keys) (very cheap, strong multilingual)
+   - **Mistral** — [get a key](https://console.mistral.ai/api-keys/) (good European languages)
+   - **OpenRouter** — [get a key](https://openrouter.ai/keys) (one key, access to many models)
 5. Pick style: **layout** (inline / block-below), **size** (75/85/100%),
    **italic** toggle, **color** picker.
 6. Click **Translate preview** — translates the first 6 paragraphs so you can
