@@ -1,6 +1,6 @@
 # EPUB Translator
 
-A small toolkit for turning a foreign-language EPUB into a **bilingual** EPUB
+A small toolkit for turning any EPUB into a **bilingual** EPUB
 — each original sentence followed by its English (or other-language)
 translation, styled however you like. Designed for language learners who want
 to read literature in the original while keeping a translation a glance away.
