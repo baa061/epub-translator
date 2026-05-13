@@ -17,6 +17,10 @@ There are two ways to use it:
 Both produce a valid EPUB with the source text preserved and translations
 inserted inline.
 
+> ⚠️ **Please read [`DISCLAIMER.md`](./DISCLAIMER.md) before use.** This tool
+> is for EPUBs you legally own or that are in the public domain — not for
+> copyrighted material you don't have the right to modify.
+
 ---
 
 ## `index.html` — browser UI

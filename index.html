@@ -204,6 +204,17 @@
   .cmd-block .copy.copied { background: var(--ok); border-color: var(--ok); color: white; }
 
   .footnote { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .disclaimer {
+    margin-top: 28px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.55;
+    text-align: center;
+  }
+  .disclaimer a { color: var(--accent); text-decoration: none; }
+  .disclaimer a:hover { text-decoration: underline; }
   .err-banner { background: #fce8e6; border: 1px solid #f3b9b3; color: var(--error); padding: 10px 14px; border-radius: 8px; font-size: 13px; }
 
   .run-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -425,9 +436,12 @@
     </div>
   </div>
 
-  <script>
-    // (Alpine init below)
-  </script>
+  <footer class="disclaimer">
+    Intended for EPUBs you legally own or that are in the public domain.
+    Don't use this with copyrighted material you don't have the right to modify.
+    See the <a href="https://github.com/baa061/epub-translator/blob/main/DISCLAIMER.md" target="_blank" rel="noopener">full disclaimer</a> ·
+    <a href="https://github.com/baa061/epub-translator" target="_blank" rel="noopener">source on GitHub</a>.
+  </footer>
 </div>
 
 <script>
